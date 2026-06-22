@@ -189,6 +189,7 @@ One JSON file at `~/.reasonix/config.json` plus per-project overrides under `<pr
 | [Permissions](https://esengine.github.io/DeepSeek-Reasonix/configuration.html#permissions) | Per-workspace shell allowlist. Exact-prefix match. |
 | [Web search](https://esengine.github.io/DeepSeek-Reasonix/configuration.html#search) | Bing by default; switch to Baidu AI Search, self-hosted SearXNG, Metaso, Tavily, Perplexity, Exa, Brave, or Ollama with `/search-engine`. |
 | [Semantic index](https://esengine.github.io/DeepSeek-Reasonix/configuration.html#index) | `reasonix index` — local Ollama or any OpenAI-compatible embedding endpoint. |
+| [Cache economics](docs/CONFIGURATION.md#cache-economics) | `cacheBustProbability` + `keepalive*` — fold large sessions and keep the prompt cache warm to cut cache-miss cost. |
 
 <br/>
 
