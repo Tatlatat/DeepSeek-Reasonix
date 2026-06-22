@@ -52,4 +52,30 @@ describe("pingCachePrefix", () => {
     // Must resolve (not throw) even when chat rejects
     await expect(loop.pingCachePrefix()).resolves.toBeUndefined();
   });
+
+  it("pingCachePrefix does not append to a populated log", async () => {
+    const chat = vi.fn().mockResolvedValue(fakeChatResponse());
+    const loop = makeTestLoop({ chat });
+
+    // Seed the log with well-formed messages via the public append API
+    // (same mechanism used by loop.test.ts compactHistory / auto-fold tests).
+    // Well-formed messages avoid triggering heavy healing; the goal is to
+    // verify no APPEND happens on a non-empty log — the core ephemeral guarantee.
+    loop.log.append({ role: "user", content: "hello" });
+    loop.log.append({ role: "assistant", content: "world" });
+
+    const before = (loop as any).log.toFullHistory().length;
+    expect(before).toBeGreaterThan(0); // sanity: log is populated
+
+    await loop.pingCachePrefix();
+
+    const after = (loop as any).log.toFullHistory().length;
+
+    // Ephemeral on a populated log: count unchanged — nothing appended
+    expect(after).toBe(before);
+
+    // Still issues exactly one max_tokens:1 chat call
+    expect(chat).toHaveBeenCalledTimes(1);
+    expect(chat.mock.calls[0]![0].maxTokens).toBe(1);
+  });
 });
