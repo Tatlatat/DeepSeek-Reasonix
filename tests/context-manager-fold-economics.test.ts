@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Usage } from "../src/client.js";
 import { ContextManager, estimateFoldEconomics } from "../src/context-manager.js";
 
-function manager(): ContextManager {
+function manager(cacheBustProbability = 0.15): ContextManager {
   return new ContextManager({
     client: {} as never,
     log: {} as never,
@@ -11,13 +11,15 @@ function manager(): ContextManager {
     getAbortSignal: () => new AbortController().signal,
     getCurrentTurn: () => 1,
     getSystemPrompt: () => "system",
+    cacheBustProbability,
   });
 }
 
 describe("ContextManager fold economics", () => {
   it("does not fold in the normal band when cache carry cost is cheaper than fold tax", () => {
     const usage = new Usage(760_000, 100, 760_100, 752_000, 8_000);
-    const decision = manager().decideAfterUsage(usage, "deepseek-v4-flash", false);
+    // P_bust=0 isolates the legacy warm-carry-is-cheap invariant (no bust-risk term).
+    const decision = manager(0).decideAfterUsage(usage, "deepseek-v4-flash", false);
 
     expect(decision.kind).toBe("none");
     expect(decision.economics?.worthwhile).toBe(false);
@@ -41,7 +43,7 @@ describe("ContextManager fold economics", () => {
 
   it("estimates fold cost over a short multi-turn horizon", () => {
     const usage = new Usage(760_000, 100, 760_100, 0, 760_000);
-    const economics = estimateFoldEconomics(usage, "deepseek-v4-flash", 200_000);
+    const economics = estimateFoldEconomics(usage, "deepseek-v4-flash", 200_000, 0.15);
 
     expect(economics.horizonTurns).toBeGreaterThan(1);
     expect(economics.carryInputUsd).toBeGreaterThan(economics.foldInputUsd);

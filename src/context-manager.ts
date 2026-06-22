@@ -69,6 +69,8 @@ export interface ContextManagerDeps {
   getFewShots?: () => readonly ChatMessage[];
   /** Fired when the message log was rewritten by fold; lets the loop drop session-scoped caches whose validity rested on the elided history (e.g. read-before-edit tracker). */
   onLogRewrite?: () => void;
+  /** P(cache-bust before next turn) fed to fold economics. Default 0.15 via loader. */
+  cacheBustProbability: number;
 }
 
 export type PostUsageDecisionKind = "none" | "fold" | "exit-with-summary";
@@ -105,6 +107,7 @@ export function estimateFoldEconomics(
   usage: Usage,
   model: string,
   tailBudgetTokens: number,
+  cacheBustProbability: number,
 ): FoldEconomics {
   const pricing = pricingFor(model);
   if (!pricing) {
@@ -119,7 +122,11 @@ export function estimateFoldEconomics(
   }
 
   const horizonTurns = HISTORY_FOLD_ECONOMIC_HORIZON_TURNS;
-  const carryInputUsd = inputCostUsd(model, usage) * horizonTurns;
+  const bustExtraPerTurnUsd =
+    (usage.promptTokens * cacheBustProbability * (pricing.inputCacheMiss - pricing.inputCacheHit)) /
+    1_000_000;
+  const carryInputUsd =
+    inputCostUsd(model, usage) * horizonTurns + bustExtraPerTurnUsd * horizonTurns;
   const summaryCallUsd = inputCostUsd(model, usage);
   const postFoldPromptTokens = Math.min(
     usage.promptTokens,
@@ -222,7 +229,12 @@ export class ContextManager {
     }
     if (ratio > HISTORY_FOLD_THRESHOLD) {
       const tailBudget = Math.floor(ctxMax * HISTORY_FOLD_TAIL_FRACTION);
-      const economics = estimateFoldEconomics(usage, model, tailBudget);
+      const economics = estimateFoldEconomics(
+        usage,
+        model,
+        tailBudget,
+        this.deps.cacheBustProbability,
+      );
       if (!economics.worthwhile) {
         return { kind: "none", ...base, economics };
       }
