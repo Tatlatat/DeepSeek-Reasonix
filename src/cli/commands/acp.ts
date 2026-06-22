@@ -5,6 +5,7 @@ import { type WriteStream, existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { dispatchKernelEvent } from "../../acp/dispatch.js";
 import { requestPermissionForGate } from "../../acp/gates.js";
+import { Keepalive } from "../../acp/keepalive.js";
 import {
   ACP_PROTOCOL_VERSION,
   type ContentBlock,
@@ -29,6 +30,9 @@ import {
   loadApiKey,
   loadEditMode,
   loadEndpoint,
+  loadKeepaliveEnabled,
+  loadKeepaliveIntervalMs,
+  loadKeepaliveMaxPings,
   loadMaxIterPerTurn,
   loadModel,
   loadReasoningEffort,
@@ -78,6 +82,7 @@ interface Session {
     reasoningEffort: import("../../config.js").ReasoningEffort;
   };
   aborter: AbortController | null;
+  keepalive: Keepalive;
 }
 
 function resolveMcpPrefix(
@@ -188,7 +193,7 @@ async function buildSession(opts: {
     maxIterPerTurn: loadMaxIterPerTurn(),
     session: `acp-${timestampSuffix()}`,
   });
-  return {
+  const session: Session = {
     id: `sess_${timestampSuffix()}-${Math.random().toString(36).slice(2, 8)}`,
     rootDir: opts.rootDir,
     model,
@@ -202,7 +207,14 @@ async function buildSession(opts: {
       reasoningEffort: loadReasoningEffort(),
     },
     aborter: null,
+    keepalive: new Keepalive({
+      enabled: loadKeepaliveEnabled(),
+      intervalMs: loadKeepaliveIntervalMs(),
+      maxPings: loadKeepaliveMaxPings(),
+      ping: () => loop.pingCachePrefix(),
+    }),
   };
+  return session;
 }
 
 export async function acpCommand(opts: AcpOptions): Promise<void> {
@@ -289,6 +301,7 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
     if (!text) {
       throw Object.assign(new Error("session/prompt: empty prompt"), { code: ERR_INVALID_PARAMS });
     }
+    session.keepalive.onTurnStart();
     session.aborter = new AbortController();
     let stopReason: StopReason = "end_turn";
     try {
@@ -337,6 +350,7 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
       stopReason = "error";
     } finally {
       session.aborter = null;
+      session.keepalive.onTurnEnd();
     }
     return { stopReason, transcriptPath: opts.transcript || null };
   });
@@ -353,6 +367,7 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
     // Tear down MCP children so spawned servers don't outlive the agent.
     const closes: Promise<unknown>[] = [];
     for (const session of sessions.values()) {
+      session.keepalive.close();
       for (const mcp of session.mcpClients) {
         closes.push(mcp.close().catch(() => undefined));
       }
