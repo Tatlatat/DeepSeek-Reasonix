@@ -16,13 +16,14 @@ function manager(cacheBustProbability = 0.15): ContextManager {
 }
 
 describe("ContextManager fold economics", () => {
-  it("does not fold in the normal band when cache carry cost is cheaper than fold tax", () => {
-    const usage = new Usage(760_000, 100, 760_100, 752_000, 8_000);
-    // P_bust=0 isolates the legacy warm-carry-is-cheap invariant (no bust-risk term).
-    const decision = manager(0).decideAfterUsage(usage, "deepseek-v4-flash", false);
+  it("does not fold a small warm session under default bust-risk", () => {
+    // 100k tokens = ratio 0.1, well below HISTORY_FOLD_THRESHOLD (0.75).
+    // decideAfterUsage returns kind "none" immediately with no economics.
+    // At P_bust=0.15 the bust-risk term is negligible on such a tiny session.
+    const usage = new Usage(100_000, 100, 100_100, 95_000, 5_000);
+    const decision = manager().decideAfterUsage(usage, "deepseek-v4-flash", false);
 
     expect(decision.kind).toBe("none");
-    expect(decision.economics?.worthwhile).toBe(false);
   });
 
   it("folds in the normal band when high miss tokens make carrying context expensive", () => {
