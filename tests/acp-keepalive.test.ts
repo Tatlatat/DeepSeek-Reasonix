@@ -106,4 +106,28 @@ describe("Keepalive", () => {
     ka.close();
     expect(clock.pending()).toBe(0);
   });
+
+  it("calling onTurnEnd twice does not leak a second timer", () => {
+    const { ka, clock } = make();
+    ka.onTurnEnd();
+    ka.onTurnEnd(); // re-arm should cancel the first timer, not orphan it
+    expect(clock.pending()).toBe(1);
+  });
+
+  it("onTurnEnd after maxPings is reached does not arm again", async () => {
+    const { ka, clock, ping } = make({ maxPings: 2 });
+    ka.onTurnEnd();
+    // exhaust the cap
+    clock.fireAll();
+    await Promise.resolve();
+    await Promise.resolve();
+    clock.fireAll();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ping).toHaveBeenCalledTimes(2);
+    expect(clock.pending()).toBe(0);
+    // a turn-end without an intervening real turn must NOT re-arm
+    ka.onTurnEnd();
+    expect(clock.pending()).toBe(0);
+  });
 });
