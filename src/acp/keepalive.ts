@@ -1,8 +1,5 @@
-/** Idle prefix-cache keepalive. After a turn ends, schedule a ping; if no real
- *  turn arrives before the interval, ping the model to renew the DeepSeek
- *  prompt cache, then re-arm — up to maxPings consecutive times. A real turn
- *  (onTurnStart) cancels the pending ping and resets the counter. Pure timer
- *  logic; the clock and the ping action are injected. */
+/** Idle prefix-cache keepalive: after a turn ends, ping the model on a timer to
+ *  renew the DeepSeek prompt cache (up to maxPings times). Clock + ping injected. */
 
 export interface KeepaliveOptions {
   enabled: boolean;

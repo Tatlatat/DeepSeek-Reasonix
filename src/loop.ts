@@ -1266,13 +1266,9 @@ export class CacheFirstLoop {
     return final;
   }
 
-  /** Touch the current prefix with a 1-token call to renew the DeepSeek prompt
-   *  cache during idle gaps. Ephemeral: appends nothing to the log, so the
-   *  prefix hash is unchanged (cache-safe). Errors are swallowed — a failed
-   *  keepalive must never affect a real turn.
-   *  Note: building the message view may compact malformed log entries in the
-   *  same pass that the next real turn would — the prefix hash is still
-   *  unchanged and no new messages are appended. */
+  /** Ephemeral max_tokens:1 keepalive ping to renew the DeepSeek prefix cache during idle gaps.
+   *  Appends nothing to the log (prefix hash unchanged). Errors are swallowed — never affects a
+   *  real turn. */
   async pingCachePrefix(): Promise<void> {
     try {
       await this.client.chat({
