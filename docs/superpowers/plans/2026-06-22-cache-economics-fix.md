@@ -28,7 +28,7 @@
 - `src/loop.ts` — MODIFY: add a public `pingCachePrefix(): Promise<void>` method to `CacheFirstLoop`.
 - `src/acp/keepalive.ts` — CREATE: pure idle-timer module (no I/O, injectable clock + ping callback).
 - `src/cli/commands/acp.ts` — MODIFY: instantiate keepalive per session and call its hooks around `session/prompt` and on close.
-- Tests: `src/context-manager.economics.test.ts`, `src/acp/keepalive.test.ts`, `src/config.cache-economics.test.ts` (create alongside existing test files — confirm the repo's test glob includes `src/**/*.test.ts`).
+- Tests: `tests/context-manager-economics.test.ts`, `tests/acp-keepalive.test.ts`, `tests/config-cache-economics.test.ts`, `tests/loop-ping-cache-prefix.test.ts`. **Test convention (verified against `vitest.config.ts`):** all tests live in top-level `tests/`, matched by glob `tests/**/*.test.ts`; tests in `src/` are NOT picked up. Tests import source as `../src/<name>.js` (e.g. `import { x } from "../src/config.js"`). Run a single file with `npx vitest run tests/<name>.test.ts`.
 
 ---
 
@@ -36,14 +36,14 @@
 
 **Files:**
 - Modify: `src/config.ts` (interface `ReasonixConfig` near L173-316; add loaders after `loadContextTokens` near L841)
-- Test: `src/config.cache-economics.test.ts`
+- Test: `tests/config-cache-economics.test.ts`
 
 **Interfaces:**
 - Produces: `loadCacheBustProbability(path?: string): number` (default 0.15), `loadKeepaliveIntervalMs(path?: string): number` (default 240000), `loadKeepaliveMaxPings(path?: string): number` (default 10), `loadKeepaliveEnabled(path?: string): boolean` (default true). All read from `readConfig(path)` and clamp to safe ranges.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/config.cache-economics.test.ts`:
+Create `tests/config-cache-economics.test.ts`:
 ```ts
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
@@ -54,7 +54,7 @@ import {
   loadKeepaliveIntervalMs,
   loadKeepaliveMaxPings,
   loadKeepaliveEnabled,
-} from "./config.js";
+} from "../src/config.js";
 
 function cfgFile(obj: unknown): string {
   const dir = mkdtempSync(join(tmpdir(), "rx-cfg-"));
@@ -100,7 +100,7 @@ describe("cache-economics config loaders", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run src/config.cache-economics.test.ts`
+Run: `npx vitest run tests/config-cache-economics.test.ts`
 Expected: FAIL — `loadCacheBustProbability` (and siblings) is not exported.
 
 - [ ] **Step 3: Add the interface fields**
@@ -143,13 +143,13 @@ export function loadKeepaliveEnabled(path: string = defaultConfigPath()): boolea
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run src/config.cache-economics.test.ts`
+Run: `npx vitest run tests/config-cache-economics.test.ts`
 Expected: PASS (all 4 tests).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/config.ts src/config.cache-economics.test.ts
+git add src/config.ts tests/config-cache-economics.test.ts
 git commit -m "feat(config): cache-economics config fields and loaders"
 ```
 
@@ -159,7 +159,7 @@ git commit -m "feat(config): cache-economics config fields and loaders"
 
 **Files:**
 - Modify: `src/context-manager.ts` (`estimateFoldEconomics` ~L104-144; its caller `decideAfterUsage` ~L221 passes the value)
-- Test: `src/context-manager.economics.test.ts`
+- Test: `tests/context-manager-economics.test.ts`
 
 **Interfaces:**
 - Consumes: `Usage` (from `./client.js`, has `promptTokens`, `promptCacheHitTokens`, `promptCacheMissTokens`), `pricingFor(model)` → `{ inputCacheHit, inputCacheMiss, output } | undefined`, `inputCostUsd(model, usage)`.
@@ -167,11 +167,11 @@ git commit -m "feat(config): cache-economics config fields and loaders"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/context-manager.economics.test.ts`:
+Create `tests/context-manager-economics.test.ts`:
 ```ts
 import { describe, it, expect } from "vitest";
-import { Usage } from "./client.js";
-import { estimateFoldEconomics } from "./context-manager.js";
+import { Usage } from "../src/client.js";
+import { estimateFoldEconomics } from "../src/context-manager.js";
 
 // v4-flash pricing: inputCacheHit 0.0028, inputCacheMiss 0.14 per 1e6 tok.
 function usageWith(promptTokens: number): Usage {
@@ -212,7 +212,7 @@ describe("estimateFoldEconomics bust-risk term", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run src/context-manager.economics.test.ts`
+Run: `npx vitest run tests/context-manager-economics.test.ts`
 Expected: FAIL — `estimateFoldEconomics` currently takes 3 args; the 4-arg calls compile but the bust cases assert the wrong result (large session `worthwhile` is currently `false`). Specifically "large session becomes worth folding" FAILS.
 
 - [ ] **Step 3: Add the bust term**
@@ -256,8 +256,8 @@ Wire the value where the ContextManager is constructed — find construction wit
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run src/context-manager.economics.test.ts`
-Expected: PASS (all 4). Then `npx vitest run src/context-manager.test.ts` (existing tests) — if any existing test calls `estimateFoldEconomics` with 3 args, update it to pass a 4th arg `0.15`; if any constructs `ContextManager` deps, add `cacheBustProbability: 0.15`.
+Run: `npx vitest run tests/context-manager-economics.test.ts`
+Expected: PASS (all 4). Then find and run existing context-manager tests: `ls tests/ | grep -i context` then `npx vitest run tests/<that-file>.test.ts` — if any existing test calls `estimateFoldEconomics` with 3 args, update it to pass a 4th arg `0.15`; if any constructs `ContextManager` deps, add `cacheBustProbability: 0.15`.
 
 - [ ] **Step 6: Run the full suite**
 
@@ -267,7 +267,7 @@ Expected: PASS (no regressions). Fix any 3-arg `estimateFoldEconomics` call or `
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/context-manager.ts src/context-manager.economics.test.ts src/loop.ts
+git add src/context-manager.ts tests/context-manager-economics.test.ts src/loop.ts
 git commit -m "feat(context-manager): add cache-bust-risk term to fold economics"
 ```
 
@@ -277,7 +277,7 @@ git commit -m "feat(context-manager): add cache-bust-risk term to fold economics
 
 **Files:**
 - Modify: `src/loop.ts` (`CacheFirstLoop`, add public method; `client` is `readonly client: DeepSeekClient` ~L153, history via `this.log.toFullHistory()` ~L618, model/system already used in the `this.client.chat({...})` call ~L969)
-- Test: `src/loop.ping.test.ts`
+- Test: `tests/loop-ping-cache-prefix.test.ts`
 
 **Interfaces:**
 - Consumes: `this.client.chat({ system, messages, model, maxTokens })` → `Promise<ChatResponse>` (see `DeepSeekClient.chat` in `src/client.ts:283`; `maxTokens` is honored at `src/client.ts:220`), `this.log.toFullHistory(): ChatMessage[]`.
@@ -285,19 +285,19 @@ git commit -m "feat(context-manager): add cache-bust-risk term to fold economics
 
 - [ ] **Step 1: Read the existing chat call to copy its shape**
 
-Run: `grep -n "this.client.chat(" src/loop.ts` and read those lines plus the surrounding system-prompt/model variables. Note the exact property names the loop already passes (e.g. `system`, `messages`, `model`, `tools`). The ping uses the SAME system + the SAME `this.log.toFullHistory()` messages, NO tools, `maxTokens: 1`.
+Run: `grep -n "this.client.chat(" src/loop.ts` and read those lines plus the surrounding system-prompt/model variables. Note the exact property names the loop already passes (e.g. `system`, `messages`, `model`, `tools`). The ping uses the SAME system + the SAME `this.log.toFullHistory()` messages, NO tools, `maxTokens: 1`. Also note: the repo has NO `src/loop.test.ts`; existing loop tests are in `tests/` (find with `ls tests/ | grep -i loop`). Copy the loop-construction helper from whichever `tests/loop-*.test.ts` builds a `CacheFirstLoop`.
 
 - [ ] **Step 2: Write the failing test**
 
-Create `src/loop.ping.test.ts`:
+Create `tests/loop-ping-cache-prefix.test.ts`:
 ```ts
 import { describe, it, expect, vi } from "vitest";
-import { CacheFirstLoop } from "./loop.js";
+import { CacheFirstLoop } from "../src/loop.js";
 
 // Build a loop with a fake client that records chat() calls. Use the same
 // constructor options the existing loop tests use — copy the helper from
-// src/loop.test.ts (look for a makeLoop/buildLoop factory) and inject a fake
-// client whose chat() resolves to a minimal ChatResponse.
+// the existing tests/loop-*.test.ts (look for a makeLoop/buildLoop factory)
+// and inject a fake client whose chat() resolves to a minimal ChatResponse.
 function fakeChatResponse() {
   return { content: "", usage: undefined, reasoningContent: undefined } as any;
 }
@@ -321,14 +321,14 @@ describe("pingCachePrefix", () => {
   });
 });
 
-// makeTestLoop: import or replicate the factory used by src/loop.test.ts.
+// makeTestLoop: import or replicate the factory used by the existing tests/loop-*.test.ts.
 declare function makeTestLoop(overrides: any): CacheFirstLoop;
 ```
-Before running, replace the `declare function makeTestLoop` with the actual loop-construction helper from `src/loop.test.ts` (open it, copy the factory, adapt to inject the fake client). If no factory exists, construct `CacheFirstLoop` with the minimal options the existing tests use.
+Before running, replace the `declare function makeTestLoop` with the actual loop-construction helper from the existing loop tests in `tests/` (find with `ls tests/ | grep -i loop`, open it, copy the factory, adapt to inject the fake client). If no factory exists, construct `CacheFirstLoop` with the minimal options the existing tests use.
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npx vitest run src/loop.ping.test.ts`
+Run: `npx vitest run tests/loop-ping-cache-prefix.test.ts`
 Expected: FAIL — `pingCachePrefix` is not a method on `CacheFirstLoop`.
 
 - [ ] **Step 4: Implement the method**
@@ -356,13 +356,13 @@ If the loop's system-prompt field is not named `this.systemPrompt`, use the same
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npx vitest run src/loop.ping.test.ts`
+Run: `npx vitest run tests/loop-ping-cache-prefix.test.ts`
 Expected: PASS (both tests).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/loop.ts src/loop.ping.test.ts
+git add src/loop.ts tests/loop-ping-cache-prefix.test.ts
 git commit -m "feat(loop): pingCachePrefix for idle cache keepalive"
 ```
 
@@ -372,7 +372,7 @@ git commit -m "feat(loop): pingCachePrefix for idle cache keepalive"
 
 **Files:**
 - Create: `src/acp/keepalive.ts`
-- Test: `src/acp/keepalive.test.ts`
+- Test: `tests/acp-keepalive.test.ts`
 
 **Interfaces:**
 - Consumes: nothing from the codebase (pure module). Injected `ping: () => Promise<void>`, and a clock: `setTimer: (fn: () => void, ms: number) => T`, `clearTimer: (t: T) => void` (default to `setTimeout`/`clearTimeout`).
@@ -380,10 +380,10 @@ git commit -m "feat(loop): pingCachePrefix for idle cache keepalive"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/acp/keepalive.test.ts`:
+Create `tests/acp-keepalive.test.ts`:
 ```ts
 import { describe, it, expect, vi } from "vitest";
-import { Keepalive } from "./keepalive.js";
+import { Keepalive } from "../src/acp/keepalive.js";
 
 // Controllable fake clock: tasks keyed by id, advance() fires due ones.
 function fakeClock() {
@@ -487,7 +487,7 @@ describe("Keepalive", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run src/acp/keepalive.test.ts`
+Run: `npx vitest run tests/acp-keepalive.test.ts`
 Expected: FAIL — `./keepalive.js` does not exist.
 
 - [ ] **Step 3: Implement the module**
@@ -567,13 +567,13 @@ export class Keepalive {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run src/acp/keepalive.test.ts`
+Run: `npx vitest run tests/acp-keepalive.test.ts`
 Expected: PASS (all 7 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/acp/keepalive.ts src/acp/keepalive.test.ts
+git add src/acp/keepalive.ts tests/acp-keepalive.test.ts
 git commit -m "feat(acp): keepalive idle-timer module"
 ```
 
@@ -583,7 +583,7 @@ git commit -m "feat(acp): keepalive idle-timer module"
 
 **Files:**
 - Modify: `src/cli/commands/acp.ts` (session creation; `session/prompt` handler ~L276-342; teardown ~L349-360)
-- Test: covered by `src/acp/keepalive.test.ts` (unit) + a manual smoke (Step 5)
+- Test: covered by `tests/acp-keepalive.test.ts` (unit) + a manual smoke (Step 5)
 
 **Interfaces:**
 - Consumes: `Keepalive` (Task 4), `loadKeepaliveEnabled/IntervalMs/MaxPings` (Task 1), `session.loop.pingCachePrefix()` (Task 3).
