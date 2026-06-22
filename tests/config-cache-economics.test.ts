@@ -52,4 +52,9 @@ describe("cache-economics config loaders", () => {
   it("treats an explicit cacheBustProbability of 0 as a valid stored value", () => {
     expect(loadCacheBustProbability(cfgFile({ cacheBustProbability: 0 }))).toBe(0);
   });
+
+  it("floors keepaliveIntervalMs at 1000ms to prevent a ping storm", () => {
+    expect(loadKeepaliveIntervalMs(cfgFile({ keepaliveIntervalMs: 1 }))).toBe(1000);
+    expect(loadKeepaliveIntervalMs(cfgFile({ keepaliveIntervalMs: 500 }))).toBe(1000);
+  });
 });

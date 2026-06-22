@@ -857,7 +857,8 @@ export function loadCacheBustProbability(path: string = defaultConfigPath()): nu
 export function loadKeepaliveIntervalMs(path: string = defaultConfigPath()): number {
   const raw = readConfig(path).keepaliveIntervalMs;
   if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return 240000;
-  return Math.floor(raw);
+  // Floor at 1s so a tiny misconfigured value can't ping-storm within an idle gap.
+  return Math.max(1000, Math.floor(raw));
 }
 
 export function loadKeepaliveMaxPings(path: string = defaultConfigPath()): number {
