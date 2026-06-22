@@ -48,4 +48,8 @@ describe("cache-economics config loaders", () => {
     expect(loadKeepaliveIntervalMs(cfgFile({ keepaliveIntervalMs: 0 }))).toBe(240000);
     expect(loadKeepaliveMaxPings(cfgFile({ keepaliveMaxPings: -1 }))).toBe(10);
   });
+
+  it("treats an explicit cacheBustProbability of 0 as a valid stored value", () => {
+    expect(loadCacheBustProbability(cfgFile({ cacheBustProbability: 0 }))).toBe(0);
+  });
 });
