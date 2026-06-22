@@ -1265,6 +1265,22 @@ export class CacheFirstLoop {
     }
     return final;
   }
+
+  /** Touch the current prefix with a 1-token call to renew the DeepSeek prompt
+   *  cache during idle gaps. Ephemeral: appends nothing to the log, so the
+   *  prefix hash is unchanged (cache-safe). Errors are swallowed — a failed
+   *  keepalive must never affect a real turn. */
+  async pingCachePrefix(): Promise<void> {
+    try {
+      await this.client.chat({
+        model: this.model,
+        messages: this.buildMessages(),
+        maxTokens: 1,
+      });
+    } catch {
+      // keepalive is best-effort; never surface to the caller
+    }
+  }
 }
 
 function parsePositiveIntEnv(raw: string | undefined): number | undefined {
