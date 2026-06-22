@@ -314,6 +314,14 @@ export interface ReasonixConfig {
     customTypes?: CustomMemoryTypeConfig[];
   };
   pricingOverride?: Record<string, PricingOverride>;
+  /** P(cache-bust before next turn) fed to fold economics. Default 0.15. `0` disables the bust term. */
+  cacheBustProbability?: number;
+  /** Keep the DeepSeek prompt cache warm during idle gaps. Default 240000 ms. */
+  keepaliveIntervalMs?: number;
+  /** Cap on consecutive idle pings before keepalive stops for an abandoned session. Default 10. */
+  keepaliveMaxPings?: number;
+  /** Enable idle prefix-cache keepalive pings. Default true. */
+  keepaliveEnabled?: boolean;
   /** Per-app proxy override. Layered on top of HTTPS_PROXY / NO_PROXY env vars + the default DeepSeek-bypass whitelist. */
   proxy?: ProxyConfig;
   rateLimit?: RateLimitConfig;
@@ -838,6 +846,29 @@ export function loadContextTokens(path: string = defaultConfigPath()): Record<st
     }
   }
   return result;
+}
+
+export function loadCacheBustProbability(path: string = defaultConfigPath()): number {
+  const raw = readConfig(path).cacheBustProbability;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0.15;
+  return Math.min(1, Math.max(0, raw));
+}
+
+export function loadKeepaliveIntervalMs(path: string = defaultConfigPath()): number {
+  const raw = readConfig(path).keepaliveIntervalMs;
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return 240000;
+  return Math.floor(raw);
+}
+
+export function loadKeepaliveMaxPings(path: string = defaultConfigPath()): number {
+  const raw = readConfig(path).keepaliveMaxPings;
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return 10;
+  return Math.floor(raw);
+}
+
+export function loadKeepaliveEnabled(path: string = defaultConfigPath()): boolean {
+  const raw = readConfig(path).keepaliveEnabled;
+  return typeof raw === "boolean" ? raw : true;
 }
 
 export function loadProxyConfig(path: string = defaultConfigPath()): ProxyConfig {
