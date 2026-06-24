@@ -872,6 +872,14 @@ export function loadKeepaliveEnabled(path: string = defaultConfigPath()): boolea
   return typeof raw === "boolean" ? raw : true;
 }
 
+// Reads the ENV var REASONIX_ACP_EPHEMERAL_SESSION (NOT the config file) — the
+// gateway sets it per fan-out lane so concurrent lanes don't load each other's
+// disk session history (session:null → zero disk I/O). 1/true/yes/on => true.
+export function loadEphemeralSession(): boolean {
+  const v = (process.env.REASONIX_ACP_EPHEMERAL_SESSION ?? "").toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
 export function loadProxyConfig(path: string = defaultConfigPath()): ProxyConfig {
   const cfg = readConfig(path).proxy;
   if (!cfg || typeof cfg !== "object") return {};

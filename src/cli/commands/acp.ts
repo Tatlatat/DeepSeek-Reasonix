@@ -30,6 +30,7 @@ import {
   loadApiKey,
   loadEditMode,
   loadEndpoint,
+  loadEphemeralSession,
   loadKeepaliveEnabled,
   loadKeepaliveIntervalMs,
   loadKeepaliveMaxPings,
@@ -191,7 +192,7 @@ async function buildSession(opts: {
     model,
     budgetUsd: opts.budgetUsd,
     maxIterPerTurn: loadMaxIterPerTurn(),
-    session: `acp-${timestampSuffix()}`,
+    session: loadEphemeralSession() ? null : `acp-${timestampSuffix()}`,
   });
   const session: Session = {
     id: `sess_${timestampSuffix()}-${Math.random().toString(36).slice(2, 8)}`,

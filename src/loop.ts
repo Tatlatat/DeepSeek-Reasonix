@@ -109,7 +109,7 @@ export interface CacheFirstLoopOptions {
   budgetUsd?: number;
   /** Maximum tool-call iterations per turn. Overrides config/env. Default 50. */
   maxIterPerTurn?: number;
-  session?: string;
+  session?: string | null;
   /** PreToolUse + PostToolUse only — UserPromptSubmit / Stop live at the App boundary. */
   hooks?: ResolvedHook[];
   /** `cwd` reported to hooks; `reasonix code` sets this to the sandbox root, not shell home. */
