@@ -25,11 +25,12 @@ import { registerPlanTool } from "../tools/plan.js";
 import { registerScaffoldTools } from "../tools/scaffold.js";
 import { registerShellTools } from "../tools/shell.js";
 import { type SkillInstalledHook, registerSkillTools } from "../tools/skills.js";
+import { EXPLORE_SYSTEM } from "../tools/subagent-types.js";
+import * as subagentMod from "../tools/subagent.js";
 import {
   SHARED_SUBAGENT_SINK,
   type SubagentSink,
   formatSubagentResult,
-  spawnSubagent,
 } from "../tools/subagent.js";
 import { registerTodoTool } from "../tools/todo.js";
 import { registerWebTools } from "../tools/web.js";
@@ -122,7 +123,7 @@ export async function buildCodeToolset(opts: CodeToolsetOpts): Promise<CodeTools
         const ep = loadEndpoint();
         subagentClient = new DeepSeekClient({ apiKey: ep.apiKey, baseUrl: ep.baseUrl });
       }
-      const result = await spawnSubagent({
+      const result = await subagentMod.spawnSubagent({
         client: subagentClient,
         parentRegistry: tools,
         parentSignal: signal,
@@ -141,7 +142,104 @@ export async function buildCodeToolset(opts: CodeToolsetOpts): Promise<CodeTools
     },
   });
 
+  // Lever B — sub-agent read-in-isolation (REASONIX_READ_ISOLATED=1, default
+  // off). When off NOTHING below runs: no new tool spec, no read_file
+  // description change → the immutable prefix is byte-identical to today, so
+  // the prefix cache is undisturbed. When on, `read_file_isolated` spawns a
+  // child loop (its own context) that reads the file and returns ONLY a ≤2K
+  // summary; the parent never ingests the raw bytes (the Claude-Code pattern).
+  if (readIsolatedEnabled()) {
+    // Nudge the existing read_file toward isolation for large files. Mutating
+    // the registered spec's description keeps this edit inside setup.ts.
+    const readFileDef = tools.get("read_file");
+    if (readFileDef && !readFileDef.description?.includes("read_file_isolated")) {
+      tools.register({
+        ...readFileDef,
+        description: `${readFileDef.description ?? ""} For large files, prefer read_file_isolated — it reads in a separate context and returns only a short summary, keeping your context clean.`,
+      });
+    }
+    const ensureSubagentClient = (): DeepSeekClient => {
+      if (!subagentClient) {
+        const ep = loadEndpoint();
+        subagentClient = new DeepSeekClient({ apiKey: ep.apiKey, baseUrl: ep.baseUrl });
+      }
+      return subagentClient;
+    };
+    tools.register({
+      name: "read_file_isolated",
+      parallelSafe: true,
+      readOnly: true,
+      description:
+        "Read a (typically large) file WITHOUT loading its raw contents into your context. Spawns a read-only child agent in a separate context that reads the file and returns only a concise ≤2K summary of what's relevant. Use this instead of read_file when you only need to UNDERSTAND a big file (its structure, where something is, whether it does X) rather than edit it — you keep your context clean and pay one cheap child loop instead of ingesting the whole file. For files you intend to edit, use read_file (the edit gate requires a direct read).",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to read (relative to rootDir or absolute).",
+          },
+          focus: {
+            type: "string",
+            description:
+              "Optional: what to look for in the file (e.g. 'the auth flow', 'where TIMEOUT is set'). Sharpens the summary; omit for a general overview.",
+          },
+        },
+        required: ["path"],
+      },
+      fn: async (args: { path?: unknown; focus?: unknown }, ctx) => {
+        const path = typeof args.path === "string" ? args.path.trim() : "";
+        if (!path) {
+          return JSON.stringify({ error: "read_file_isolated requires a non-empty 'path'." });
+        }
+        const focus =
+          typeof args.focus === "string" && args.focus.trim().length > 0
+            ? args.focus.trim()
+            : undefined;
+        // Adoption trace (off by default): when REASONIX_READ_ISOLATED_TRACE is a
+        // file path, append one line per call so the bench can count how often the
+        // model actually CHOSE this tool — adoption is Lever B's make-or-break metric.
+        const tracePath = (process.env.REASONIX_READ_ISOLATED_TRACE ?? "").trim();
+        if (tracePath) {
+          try {
+            const { appendFileSync } = await import("node:fs");
+            appendFileSync(tracePath, `${JSON.stringify({ ts: Date.now(), path })}\n`);
+          } catch {
+            // tracing must never break the tool dispatch
+          }
+        }
+        const task = focus
+          ? `Read the file at path "${path}" using read_file (chunk with range/head/tail if large) and return a ≤2000-character summary focused on: ${focus}. Lead with the conclusion; cite file:line ranges. Do NOT paste the raw file back.`
+          : `Read the file at path "${path}" using read_file (chunk with range/head/tail if large) and return a ≤2000-character summary of its purpose, structure, and key contents. Lead with the conclusion; cite file:line ranges. Do NOT paste the raw file back.`;
+        const result = await subagentMod.spawnSubagent({
+          client: ensureSubagentClient(),
+          parentRegistry: tools,
+          system: EXPLORE_SYSTEM,
+          task,
+          // Read-only child: only the tools it needs to read + locate.
+          allowedTools: [
+            "read_file",
+            "search_content",
+            "search_files",
+            "list_directory",
+            "get_file_info",
+          ],
+          // Hard-cap the surfaced result so the parent never ingests bulk.
+          maxResultChars: 2000,
+          parentSignal: ctx?.signal,
+          sink: opts.subagentSink ?? SHARED_SUBAGENT_SINK,
+        });
+        return formatSubagentResult(result);
+      },
+    });
+  }
+
   const semantic = await reBootstrapSemantic(opts.rootDir);
 
   return { tools, jobs, registerRooted, reBootstrapSemantic, semantic };
+}
+
+/** REASONIX_READ_ISOLATED=1 turns on the read_file_isolated tool (Lever B). Default off → byte-stable prefix. */
+function readIsolatedEnabled(): boolean {
+  const v = (process.env.REASONIX_READ_ISOLATED ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
 }

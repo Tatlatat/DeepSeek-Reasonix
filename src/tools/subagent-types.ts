@@ -8,7 +8,7 @@ export interface SubagentTypeSpec {
   system: string;
 }
 
-const EXPLORE_SYSTEM = `You are an exploration subagent. Wide-net read-only investigation; return one distilled answer.
+export const EXPLORE_SYSTEM = `You are an exploration subagent. Wide-net read-only investigation; return one distilled answer.
 
 How to operate:
 - Read-only tools only (read_file, search_files, search_content, directory_tree, list_directory, get_file_info).
