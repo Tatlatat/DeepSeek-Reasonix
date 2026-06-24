@@ -256,6 +256,11 @@ export type {
 export { CODE_SYSTEM_PROMPT, codeSystemPrompt } from "./code/prompt.js";
 export type { CodeSystemPromptOptions } from "./code/prompt.js";
 export { buildCodeToolset } from "./code/setup.js";
+// Lever D — pre-index. Re-export the EXISTING semantic-index build + compat
+// helpers so the fleet gateway can build the index ONCE per codebase (the sole
+// build trigger) and per-lane shims can cheaply check `indexCompatible()`
+// read-only — no extra prefix bytes, so the immutable prefix stays byte-stable.
+export { buildIndex, indexCompatible } from "./index/semantic/builder.js";
 export {
   MCP_PROTOCOL_VERSION,
   isJsonRpcError,
