@@ -1,7 +1,7 @@
 {
-  "name": "reasonix",
+  "name": "deepseek-reasonix-engine",
   "version": "0.52.0",
-  "description": "DeepSeek-native coding agent: cache-first loop, flash-first cost control, tool-call repair.",
+  "description": "DeepSeek-native cache-first agent engine (fork of DeepSeek-Reasonix), embedded by the reasonix fleet.",
   "type": "module",
   "bin": {
     "reasonix": "dist/cli/index.js",
@@ -66,11 +66,11 @@
     "cli",
     "tui"
   ],
-  "author": "esengine",
+  "author": "Tatlatat",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/esengine/DeepSeek-Reasonix.git"
+    "url": "git+https://github.com/Tatlatat/DeepSeek-Reasonix.git"
   },
   "bugs": {
     "url": "https://github.com/esengine/DeepSeek-Reasonix/issues"
