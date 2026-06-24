@@ -255,6 +255,7 @@ export type {
 } from "./code/edit-blocks.js";
 export { CODE_SYSTEM_PROMPT, codeSystemPrompt } from "./code/prompt.js";
 export type { CodeSystemPromptOptions } from "./code/prompt.js";
+export { buildCodeToolset } from "./code/setup.js";
 export {
   MCP_PROTOCOL_VERSION,
   isJsonRpcError,
@@ -294,6 +295,7 @@ export {
   isPlausibleKey,
   loadApiKey,
   loadBaseUrl,
+  loadEndpoint,
   loadBaiduApiKey,
   loadMetasoApiKey,
   loadPerplexityApiKey,
