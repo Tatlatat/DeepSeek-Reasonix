@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-engine/
 coverage/
 .stryker-tmp/
 .env

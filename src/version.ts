@@ -24,7 +24,10 @@ function readPackageVersion(): string {
       const p = join(dir, "package.json");
       if (existsSync(p)) {
         const pkg = JSON.parse(readFileSync(p, "utf8"));
-        if (pkg?.name === "reasonix" && typeof pkg.version === "string") {
+        if (
+          (pkg?.name === "reasonix" || pkg?.name === "deepseek-reasonix-engine") &&
+          typeof pkg.version === "string"
+        ) {
           return pkg.version;
         }
       }
